@@ -1,0 +1,6 @@
+[build]
+target = "amdgcn-amd-amdhsa"
+rustflags = ["-Ctarget-cpu=gfx1102"]
+
+[unstable]
+build-std = ["core"]

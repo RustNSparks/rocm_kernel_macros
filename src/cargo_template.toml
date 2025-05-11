@@ -1,0 +1,15 @@
+[package]
+name = "kernels"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.dev]
+lto = true
+[profile.release]
+lto = true
