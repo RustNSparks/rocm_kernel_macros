@@ -22,32 +22,34 @@ pub fn amdgpu_kernel(input: TokenStream) -> TokenStream {
         kernel_body += "\n\n";
     }
 
-    let preamble = r#"
-#![no_std]
-#![feature(abi_gpu_kernel)]
-#![feature(core_intrinsics, link_llvm_intrinsics)]
+    let preamble = quote! {
+        #![no_std]
+        #![feature(abi_gpu_kernel)]
+        #![feature(core_intrinsics, link_llvm_intrinsics)]
 
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
+        extern crate alloc;
 
-unsafe extern "C" {
-    #[link_name = "llvm.amdgcn.workitem.id.x"]
-    pub fn workitem_id_x() -> u32;
-    #[link_name = "llvm.amdgcn.workitem.id.y"]
-    pub fn workitem_id_y() -> u32;
-    #[link_name = "llvm.amdgcn.workitem.id.z"]
-    pub fn workitem_id_z() -> u32;
+        #[panic_handler]
+        fn panic(_: &core::panic::PanicInfo) -> ! {
+            loop {}
+        }
 
-    #[link_name = "llvm.amdgcn.workgroup.id.x"]
-    pub fn workgroup_id_x() -> u32;
-    #[link_name = "llvm.amdgcn.workgroup.id.y"]
-    pub fn workgroup_id_y() -> u32;
-    #[link_name = "llvm.amdgcn.workgroup.id.z"]
-    pub fn workgroup_id_z() -> u32;
-}
-"#;
+        unsafe extern "C" {
+            #[link_name = "llvm.amdgcn.workitem.id.x"]
+            pub fn workitem_id_x() -> u32;
+            #[link_name = "llvm.amdgcn.workitem.id.y"]
+            pub fn workitem_id_y() -> u32;
+            #[link_name = "llvm.amdgcn.workitem.id.z"]
+            pub fn workitem_id_z() -> u32;
+
+            #[link_name = "llvm.amdgcn.workgroup.id.x"]
+            pub fn workgroup_id_x() -> u32;
+            #[link_name = "llvm.amdgcn.workgroup.id.y"]
+            pub fn workgroup_id_y() -> u32;
+            #[link_name = "llvm.amdgcn.workgroup.id.z"]
+            pub fn workgroup_id_z() -> u32;
+        }
+    };
 
     let full_source = format!("{preamble}\n\n{kernel_body}");
 
