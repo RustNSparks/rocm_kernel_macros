@@ -4,54 +4,36 @@ use quote::quote;
 use std::process::Command;
 use std::{fs, path::Path};
 use syn::{File, Item, parse_macro_input};
+mod preamble;
 
 #[proc_macro]
 pub fn amdgpu_kernel(input: TokenStream) -> TokenStream {
-    let file = parse_macro_input!(input as File);
+    let cloned = input.clone();
+    let file = parse_macro_input!(cloned as File);
 
     let mut kernel_body = String::new();
     let mut kernel_names = Vec::new();
-
     for item in file.items {
-        if let Item::Fn(ref func) = item {
+        let modified_item = if let Item::Fn(mut func) = item.clone() {
             let name = func.sig.ident.to_string();
             kernel_names.push(name);
-        }
+
+            // Add attributes
+            func.attrs.push(syn::parse_quote!(#[unsafe(no_mangle)]));
+            func.vis = syn::parse_quote!(pub);
+            func.sig.abi = Some(syn::parse_quote!(extern "gpu-kernel"));
+
+            quote!(#func)
+        } else {
+            quote!(#item)
+        };
+
         // Append the code of all items to be written into lib.rs
-        kernel_body += &quote!(#item).to_string();
+        kernel_body += &modified_item.to_string();
         kernel_body += "\n\n";
     }
 
-    let preamble = quote! {
-        #![no_std]
-        #![feature(abi_gpu_kernel)]
-        #![feature(core_intrinsics, link_llvm_intrinsics)]
-
-        extern crate alloc;
-
-        #[panic_handler]
-        fn panic(_: &core::panic::PanicInfo) -> ! {
-            loop {}
-        }
-
-        unsafe extern "C" {
-            #[link_name = "llvm.amdgcn.workitem.id.x"]
-            pub fn workitem_id_x() -> u32;
-            #[link_name = "llvm.amdgcn.workitem.id.y"]
-            pub fn workitem_id_y() -> u32;
-            #[link_name = "llvm.amdgcn.workitem.id.z"]
-            pub fn workitem_id_z() -> u32;
-
-            #[link_name = "llvm.amdgcn.workgroup.id.x"]
-            pub fn workgroup_id_x() -> u32;
-            #[link_name = "llvm.amdgcn.workgroup.id.y"]
-            pub fn workgroup_id_y() -> u32;
-            #[link_name = "llvm.amdgcn.workgroup.id.z"]
-            pub fn workgroup_id_z() -> u32;
-        }
-    };
-
-    let full_source = format!("{preamble}\n\n{kernel_body}");
+    let full_source = format!("{}\n\n{}", preamble::preamble(), kernel_body);
 
     let kernel_dir_name = kernel_names.join("_");
 
@@ -59,11 +41,14 @@ pub fn amdgpu_kernel(input: TokenStream) -> TokenStream {
 
     let binary_path_str = build(&kernel_dir_name);
 
-    let output = quote! {
+        let extra = quote! {
         pub const KERNEL_BINARY_PATH: &str = #binary_path_str;
     };
 
-    output.into()
+    let mut output = TokenStream::new();
+    output.extend([preamble::dummy_preamble(), input, extra.into()].into_iter());
+
+    output
 }
 
 fn generate_enviorment(name: &str, src: &str) {
