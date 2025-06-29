@@ -1,6 +1,6 @@
 [package]
 name = "rocm_kernel_macros"
-version = "0.2.2"
+version = "0.3.0-rc1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["WhiskyAKM"]
@@ -15,3 +15,6 @@ proc-macro = true
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
+fslock = "0.2.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

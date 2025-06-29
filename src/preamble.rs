@@ -1,33 +1,33 @@
 use quote::quote;
 
-pub fn preamble() -> proc_macro::TokenStream {
-    quote! {
-        #![no_std]
-        #![feature(abi_gpu_kernel)]
-        #![feature(core_intrinsics, link_llvm_intrinsics)]
+pub fn preamble() -> &'static str {
+    r#"
+// ROCM_PREAMBLE_START
+#![no_std]
+#![feature(abi_gpu_kernel)]
+#![feature(core_intrinsics, link_llvm_intrinsics)]
 
-        #[panic_handler]
-        fn panic(_: &core::panic::PanicInfo) -> ! {
-            loop {}
-        }
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
 
-        unsafe extern "C" {
-            #[link_name = "llvm.amdgcn.workitem.id.x"]
-            pub fn workitem_id_x() -> u32;
-            #[link_name = "llvm.amdgcn.workitem.id.y"]
-            pub fn workitem_id_y() -> u32;
-            #[link_name = "llvm.amdgcn.workitem.id.z"]
-            pub fn workitem_id_z() -> u32;
+unsafe extern "C" {
+    #[link_name = "llvm.amdgcn.workitem.id.x"]
+    pub fn workitem_id_x() -> u32;
+    #[link_name = "llvm.amdgcn.workitem.id.y"]
+    pub fn workitem_id_y() -> u32;
+    #[link_name = "llvm.amdgcn.workitem.id.z"]
+    pub fn workitem_id_z() -> u32;
 
-            #[link_name = "llvm.amdgcn.workgroup.id.x"]
-            pub fn workgroup_id_x() -> u32;
-            #[link_name = "llvm.amdgcn.workgroup.id.y"]
-            pub fn workgroup_id_y() -> u32;
-            #[link_name = "llvm.amdgcn.workgroup.id.z"]
-            pub fn workgroup_id_z() -> u32;
-        }
-    }
-    .into()
+    #[link_name = "llvm.amdgcn.workgroup.id.x"]
+    pub fn workgroup_id_x() -> u32;
+    #[link_name = "llvm.amdgcn.workgroup.id.y"]
+    pub fn workgroup_id_y() -> u32;
+    #[link_name = "llvm.amdgcn.workgroup.id.z"]
+    pub fn workgroup_id_z() -> u32;
+}
+    "#
 }
 
 pub fn dummy_preamble() -> proc_macro::TokenStream {
