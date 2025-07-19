@@ -4,14 +4,14 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::process::Command;
 use std::{fs, path::Path};
-use syn::{File, Item, parse_macro_input};
+use syn::{Item, parse_macro_input};
 mod preamble;
 use std::collections::HashMap;
 
 const LOCK_PATH: &str = "rocm_attr.lock";
 
 #[proc_macro]
-pub fn amdgpu_kernel_begin(_item: TokenStream) -> TokenStream {
+pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
     let kernel_dir = Path::new("kernel_sources").join("kernel");
     let src_path = kernel_dir.join("src/lib.rs");
     let store_path = kernel_dir.join("items.json");
@@ -35,7 +35,7 @@ pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
     lockfile.unlock().unwrap();
 
     quote! {
-        const AMDGPU_KERNEL_BINARY_PATH: &str = #binary_path;
+        #binary_path
     }
     .into()
 }
@@ -47,6 +47,8 @@ pub fn amdgpu_kernel_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let normalized = match item_parsed.clone() {
         Item::Fn(mut func) => {
+            func.attrs.push(syn::parse_quote!(#[allow(unused)]));
+            func.attrs.push(syn::parse_quote!(#[allow(dead_code)]));
             func.attrs.push(syn::parse_quote!(#[unsafe(no_mangle)]));
             func.vis = syn::parse_quote!(pub);
             func.sig.abi = Some(syn::parse_quote!(extern "gpu-kernel"));
@@ -124,7 +126,7 @@ fn reconstruct_kernel_lib(name: &str) {
     let lib_path = kernel_dir.join("src/lib.rs");
 
     let mut lib_code = String::new();
-    lib_code.push_str(preamble::preamble());
+    lib_code.push_str(&preamble::preamble());
 
     if store_path.exists() {
         let items: HashMap<String, String> =
