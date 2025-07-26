@@ -36,6 +36,22 @@ pub fn preamble() -> String {
     pub fn workgroup_id_x() -> u32 {unsafe {llvm_bindings::workgroup_id_x()}}
     pub fn workgroup_id_y() -> u32 {unsafe {llvm_bindings::workgroup_id_y()}}
     pub fn workgroup_id_z() -> u32 {unsafe {llvm_bindings::workgroup_id_z()}}
+
+    
+    pub fn read_by_workitem_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+    pub fn read_by_workitem_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+    pub fn read_by_workitem_id_z<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+    pub fn read_by_workgroup_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+    pub fn read_by_workgroup_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+    pub fn read_by_workgroup_id_z<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+
+    pub fn write_by_workitem_id_x<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+    pub fn write_by_workitem_id_y<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+    pub fn write_by_workitem_id_z<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+    pub fn write_by_workgroup_id_x<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+    pub fn write_by_workgroup_id_y<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+    pub fn write_by_workgroup_id_z<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+
     }
     .to_string()
 }
@@ -48,6 +64,20 @@ pub fn dummy_preamble() -> proc_macro::TokenStream {
         pub fn workgroup_id_x() -> u32 {0}
         pub fn workgroup_id_y() -> u32 {0}
         pub fn workgroup_id_z() -> u32 {0}
+        
+        pub fn read_by_workitem_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+        pub fn read_by_workitem_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+        pub fn read_by_workitem_id_z<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+        pub fn read_by_workgroup_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+        pub fn read_by_workgroup_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+        pub fn read_by_workgroup_id_z<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
+
+        pub fn write_by_workitem_id_x<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+        pub fn write_by_workitem_id_y<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+        pub fn write_by_workitem_id_z<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+        pub fn write_by_workgroup_id_x<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+        pub fn write_by_workgroup_id_y<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
+        pub fn write_by_workgroup_id_z<T: Clone + Copy>(target: *mut T, value: T) { unsafe {*target.add(workitem_id_x() as usize) = value}}
     }
     .into()
 }

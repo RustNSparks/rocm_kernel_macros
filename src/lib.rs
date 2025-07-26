@@ -1,6 +1,6 @@
 extern crate proc_macro;
 use fslock::LockFile;
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream};
 use quote::quote;
 use std::process::Command;
 use std::{fs, path::Path};
@@ -32,8 +32,6 @@ pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
     reconstruct_kernel_lib("kernel");
     let binary_path = build("kernel");
 
-    lockfile.unlock().unwrap();
-
     quote! {
         #binary_path
     }
@@ -41,14 +39,12 @@ pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn amdgpu_kernel_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn amdgpu_kernel_attr(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let cloned = item.clone();
     let item_parsed = parse_macro_input!(cloned as Item);
 
     let normalized = match item_parsed.clone() {
         Item::Fn(mut func) => {
-            func.attrs.push(syn::parse_quote!(#[allow(unused)]));
-            func.attrs.push(syn::parse_quote!(#[allow(dead_code)]));
             func.attrs.push(syn::parse_quote!(#[unsafe(no_mangle)]));
             func.vis = syn::parse_quote!(pub);
             func.sig.abi = Some(syn::parse_quote!(extern "gpu-kernel"));
@@ -64,9 +60,7 @@ pub fn amdgpu_kernel_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     store_kernel_item("kernel", &identifier, &normalized);
 
-    lockfile.unlock().unwrap();
-
-    item
+    quote!(#[allow(unused)] #item_parsed).into()
 }
 
 fn get_item_identifier(item: &Item) -> String {
@@ -155,7 +149,7 @@ fn build(name: &str) -> String {
         .expect("Failed to execute cargo build");
 
     if !status.success() {
-        panic!("Kernel compilation failed for {}", name);
+        panic!("Kernel compilation failed for {}, status: {}", name, status);
     }
 
     kernel_dir
