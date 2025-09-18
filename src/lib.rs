@@ -1,12 +1,14 @@
 extern crate proc_macro;
 use fslock::LockFile;
-use proc_macro::{TokenStream};
+use proc_macro::TokenStream;
 use quote::quote;
 use std::process::Command;
 use std::{fs, path::Path};
 use syn::{Item, parse_macro_input};
 mod preamble;
-use std::collections::HashMap;
+
+mod structure;
+use structure::*;
 
 const LOCK_PATH: &str = "rocm_attr.lock";
 
@@ -20,7 +22,7 @@ pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
     let _ = fs::remove_file(&store_path);
 
     create_kernel_structure("kernel");
-    
+
     preamble::dummy_preamble().into()
 }
 
@@ -69,9 +71,7 @@ fn get_item_identifier(item: &Item) -> String {
         Item::Struct(s) => format!("struct {}", s.ident),
         Item::Impl(i) => {
             let ty_str = match i.self_ty.as_ref() {
-                syn::Type::Path(type_path) => {
-                    quote!(#type_path.path).to_string()
-                }
+                syn::Type::Path(type_path) => quote!(#type_path.path).to_string(),
                 _ => "impl_unknown".into(),
             };
             format!("impl {}", ty_str.trim())
@@ -82,74 +82,27 @@ fn get_item_identifier(item: &Item) -> String {
     }
 }
 
-fn create_kernel_structure(name: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
-    fs::create_dir_all(kernel_dir.join("src")).unwrap();
-    fs::create_dir_all(kernel_dir.join(".cargo")).unwrap();
-    fs::write(
-        kernel_dir.join(".cargo/config.toml"),
-        include_str!("cargo_config_template.toml"),
-    )
-    .unwrap();
-
-    fs::write(
-        kernel_dir.join("Cargo.toml"),
-        include_str!("cargo_template.toml"),
-    )
-    .unwrap();
-}
-
-fn store_kernel_item(name: &str, id: &str, item: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
-    let store_path = kernel_dir.join("items.json");
-
-    let mut items: HashMap<String, String> = if store_path.exists() {
-        serde_json::from_str(&fs::read_to_string(&store_path).unwrap()).unwrap()
-    } else {
-        HashMap::new()
-    };
-
-    items.insert(id.to_string(), item.to_string());
-
-    fs::write(store_path, serde_json::to_string_pretty(&items).unwrap()).unwrap();
-}
-
-fn reconstruct_kernel_lib(name: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
-    let store_path = kernel_dir.join("items.json");
-    let lib_path = kernel_dir.join("src/lib.rs");
-
-    let mut lib_code = String::new();
-    lib_code.push_str(&preamble::preamble());
-
-    if store_path.exists() {
-        let items: HashMap<String, String> =
-            serde_json::from_str(&fs::read_to_string(store_path).unwrap()).unwrap();
-
-        let mut keys: Vec<_> = items.keys().collect();
-        keys.sort();
-
-        for key in keys {
-            lib_code.push_str(&items[key]);
-            lib_code.push('\n');
-        }
-    }
-
-    fs::write(lib_path, lib_code).unwrap();
-}
 
 fn build(name: &str) -> String {
     let current_dir = std::env::current_dir().unwrap();
     let kernel_dir = current_dir.join("kernel_sources").join(name);
 
-    let status = Command::new("cargo")
+    let command = Command::new("cargo")
         .args(&["build", "--release"])
         .current_dir(&kernel_dir)
-        .status()
+        .output()
         .expect("Failed to execute cargo build");
 
+    let status = command.status;
+
     if !status.success() {
-        panic!("Kernel compilation failed for {}, status: {}", name, status);
+        panic!(
+            "Kernel compilation failed for {}, status: {}\n\nStdout:\n{}\n\nStderr:\n{}",
+            name,
+            status,
+            String::from_utf8_lossy(&command.stdout),
+            String::from_utf8_lossy(&command.stderr)
+        );
     }
 
     kernel_dir
