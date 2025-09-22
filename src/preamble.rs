@@ -58,12 +58,19 @@ pub fn preamble() -> String {
 
 pub fn dummy_preamble() -> proc_macro::TokenStream {
     quote! {
-        pub fn workitem_id_x() -> u32 {0}
-        pub fn workitem_id_y() -> u32 {0}
-        pub fn workitem_id_z() -> u32 {0}
-        pub fn workgroup_id_x() -> u32 {0}
-        pub fn workgroup_id_y() -> u32 {0}
-        pub fn workgroup_id_z() -> u32 {0}
+        static WORKITEM_ID_X: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        static WORKITEM_ID_Y: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        static WORKITEM_ID_Z: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0); 
+        static WORKGROUP_ID_X: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        static WORKGROUP_ID_Y: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        static WORKGROUP_ID_Z: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+        pub fn workitem_id_x() -> u32 {WORKITEM_ID_X.load(std::sync::atomic::Ordering::Relaxed)}
+        pub fn workitem_id_y() -> u32 {WORKITEM_ID_Y.load(std::sync::atomic::Ordering::Relaxed)}
+        pub fn workitem_id_z() -> u32 {WORKITEM_ID_Z.load(std::sync::atomic::Ordering::Relaxed)}
+        pub fn workgroup_id_x() -> u32 {WORKGROUP_ID_X.load(std::sync::atomic::Ordering::Relaxed)}
+        pub fn workgroup_id_y() -> u32 {WORKGROUP_ID_Y.load(std::sync::atomic::Ordering::Relaxed)}
+        pub fn workgroup_id_z() -> u32 {WORKGROUP_ID_Z.load(std::sync::atomic::Ordering::Relaxed)}
         
         pub fn read_by_workitem_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
         pub fn read_by_workitem_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
