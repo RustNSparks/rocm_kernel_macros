@@ -37,7 +37,6 @@ pub fn preamble() -> String {
     pub fn workgroup_id_y() -> u32 {unsafe {llvm_bindings::workgroup_id_y()}}
     pub fn workgroup_id_z() -> u32 {unsafe {llvm_bindings::workgroup_id_z()}}
 
-    
     pub fn read_by_workitem_id_x<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
     pub fn read_by_workitem_id_y<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}
     pub fn read_by_workitem_id_z<T: Clone + Copy>(data: *const T) -> T { unsafe {*data.add(workitem_id_x() as usize)}}

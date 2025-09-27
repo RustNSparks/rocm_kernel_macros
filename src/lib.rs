@@ -12,6 +12,10 @@ use structure::*;
 
 const LOCK_PATH: &str = "rocm_attr.lock";
 
+/// # Functionality
+/// Generates kernel_sources dir.
+/// 
+/// If your kernel code is split across multiple files, this macro must be placed before including them.
 #[proc_macro]
 pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
     let kernel_dir = Path::new("kernel_sources").join("kernel");
@@ -26,6 +30,12 @@ pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
     preamble::dummy_preamble().into()
 }
 
+/// # Functionality
+/// Compiles kernel.
+///
+/// # Panics
+///
+/// Panics if compilation error occurs.
 #[proc_macro]
 pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
@@ -40,8 +50,13 @@ pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
     .into()
 }
 
+/// # Functionality
+/// Copies marked scope to device. If function is marked as global it can be launched from host side.
+/// 
+/// For performance reasons, if function doesnt need to be called from host side you can mark it with `#[amdgpu_device]`.
+///
 #[proc_macro_attribute]
-pub fn amdgpu_kernel_attr(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn amdgpu_global(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let cloned = item.clone();
     let item_parsed = parse_macro_input!(cloned as Item);
 
@@ -54,6 +69,26 @@ pub fn amdgpu_kernel_attr(_attr: TokenStream, item: TokenStream) -> TokenStream 
         }
         _ => quote!(#item_parsed).to_string(),
     };
+
+    let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
+    lockfile.lock().unwrap();
+
+    let identifier = get_item_identifier(&item_parsed);
+
+    store_kernel_item("kernel", &identifier, &normalized);
+
+    quote!(#[allow(unused)] #item_parsed).into()
+}
+
+/// # Functionality
+/// Copies marked scope to device. If function is marked as device it can only be called from other device side functions.
+///
+#[proc_macro_attribute]
+pub fn amdgpu_device(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let cloned = item.clone();
+    let item_parsed = parse_macro_input!(cloned as Item);
+
+    let normalized = quote!(#item_parsed).to_string();
 
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
     lockfile.lock().unwrap();
@@ -81,7 +116,6 @@ fn get_item_identifier(item: &Item) -> String {
         _ => "unknown".to_string(),
     }
 }
-
 
 fn build(name: &str) -> String {
     let current_dir = std::env::current_dir().unwrap();

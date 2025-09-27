@@ -42,6 +42,7 @@ pub fn reconstruct_kernel_lib(name: &str) {
 
     let mut lib_code = String::new();
     lib_code.push_str(&preamble::preamble());
+    lib_code.push_str("\n\n");
 
     if store_path.exists() {
         let items: HashMap<String, String> =
@@ -52,7 +53,7 @@ pub fn reconstruct_kernel_lib(name: &str) {
 
         for key in keys {
             lib_code.push_str(&items[key]);
-            lib_code.push('\n');
+            lib_code.push_str("\n\n");
         }
     }
 
