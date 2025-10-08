@@ -18,6 +18,9 @@ const LOCK_PATH: &str = "rocm_attr.lock";
 /// If your kernel code is split across multiple files, this macro must be placed before including them.
 #[proc_macro]
 pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
+    let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
+    lockfile.lock().unwrap();
+
     let kernel_dir = Path::new("kernel_sources").join("kernel");
     let src_path = kernel_dir.join("src/lib.rs");
     let store_path = kernel_dir.join("items.json");
@@ -26,6 +29,8 @@ pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
     let _ = fs::remove_file(&store_path);
 
     create_kernel_structure("kernel");
+
+    lockfile.unlock().unwrap();
 
     preamble::dummy_preamble().into()
 }
