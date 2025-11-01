@@ -2,8 +2,7 @@ extern crate proc_macro;
 use fslock::LockFile;
 use proc_macro::TokenStream;
 use quote::quote;
-use std::process::Command;
-use std::{fs, path::Path};
+use std::{collections::HashMap, process::Command};
 use syn::{Item, parse_macro_input};
 mod preamble;
 
@@ -14,25 +13,47 @@ const LOCK_PATH: &str = "rocm_attr.lock";
 
 /// # Functionality
 /// Generates kernel_sources dir.
-/// 
+///
 /// If your kernel code is split across multiple files, this macro must be placed before including them.
 #[proc_macro]
-pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
+pub fn amdgpu_kernel_init(items: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
     lockfile.lock().unwrap();
 
-    let kernel_dir = Path::new("kernel_sources").join("kernel");
-    let src_path = kernel_dir.join("src/lib.rs");
-    let store_path = kernel_dir.join("items.json");
+    let (path, gfx) = parse_kernel_init_args(items);
 
-    let _ = fs::remove_file(&src_path);
-    let _ = fs::remove_file(&store_path);
+    let path = get_path_from_item(path, "kernel");
 
-    create_kernel_structure("kernel");
+    cleanup_kernel_structure(&path);
+
+    create_kernel_structure(&path, gfx);
 
     lockfile.unlock().unwrap();
 
     preamble::dummy_preamble().into()
+}
+
+fn parse_kernel_init_args(items: TokenStream) -> (String, Option<String>) {
+    let items = items
+        .into_iter()
+        .filter(|e| e.to_string() != ",")
+        .collect::<Vec<_>>()
+        .chunks(3)
+        .map(|chunk| {
+            return (chunk[0].to_string(), chunk[2].to_string());})
+        .fold(HashMap::new(), |mut acc, (ident, item)| {
+            acc.insert(ident, item);
+            acc
+        });
+
+    let path = items
+        .get("path")
+        .cloned()
+        .get_or_insert_default()
+        .to_owned();
+    let gfx = items.get("gfx").cloned().map(|s| s.to_owned());
+
+    return (path, gfx);
 }
 
 /// # Functionality
@@ -42,12 +63,14 @@ pub fn amdgpu_kernel_init(_item: TokenStream) -> TokenStream {
 ///
 /// Panics if compilation error occurs.
 #[proc_macro]
-pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
+pub fn amdgpu_kernel_finalize(item: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
     lockfile.lock().unwrap();
 
-    reconstruct_kernel_lib("kernel");
-    let binary_path = build("kernel");
+    let path = get_path_from_item(item, "kernel");
+
+    reconstruct_kernel_lib(&path);
+    let binary_path = build(&path);
 
     quote! {
         #binary_path
@@ -57,11 +80,11 @@ pub fn amdgpu_kernel_finalize(_item: TokenStream) -> TokenStream {
 
 /// # Functionality
 /// Copies marked scope to device. If function is marked as global it can be launched from host side.
-/// 
+///
 /// For performance reasons, if function doesnt need to be called from host side you can mark it with `#[amdgpu_device]`.
 ///
 #[proc_macro_attribute]
-pub fn amdgpu_global(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn amdgpu_global(attr: TokenStream, item: TokenStream) -> TokenStream {
     let cloned = item.clone();
     let item_parsed = parse_macro_input!(cloned as Item);
 
@@ -80,7 +103,11 @@ pub fn amdgpu_global(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let identifier = get_item_identifier(&item_parsed);
 
-    store_kernel_item("kernel", &identifier, &normalized);
+    store_kernel_item(
+        &get_path_from_item(attr, "kernel"),
+        &identifier,
+        &normalized,
+    );
 
     quote!(#[allow(unused)] #item_parsed).into()
 }
@@ -89,7 +116,7 @@ pub fn amdgpu_global(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Copies marked scope to device. If function is marked as device it can only be called from other device side functions.
 ///
 #[proc_macro_attribute]
-pub fn amdgpu_device(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn amdgpu_device(attr: TokenStream, item: TokenStream) -> TokenStream {
     let cloned = item.clone();
     let item_parsed = parse_macro_input!(cloned as Item);
 
@@ -100,7 +127,11 @@ pub fn amdgpu_device(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let identifier = get_item_identifier(&item_parsed);
 
-    store_kernel_item("kernel", &identifier, &normalized);
+    store_kernel_item(
+        &get_path_from_item(attr, "kernel"),
+        &identifier,
+        &normalized,
+    );
 
     quote!(#[allow(unused)] #item_parsed).into()
 }

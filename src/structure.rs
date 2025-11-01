@@ -1,17 +1,43 @@
+use regex::Regex;
 use std::{collections::HashMap, fs, path::Path};
 
 use crate::preamble;
 
+pub fn get_path_from_item(item: impl ToString, postamble: &str) -> String {
+    let mut path_addition = String::new();
 
-pub fn create_kernel_structure(name: &str) {
+    let str_item = item.to_string();
+    let trimmed_item = str_item.trim();
+    if !trimmed_item.is_empty() {
+        path_addition += trimmed_item;
+        path_addition += "_"
+    }
+
+    path_addition + postamble
+}
+
+pub fn cleanup_kernel_structure(name: &str) {
+    let kernel_dir = Path::new("kernel_sources").join(name);
+    let src_path = kernel_dir.join("src/lib.rs");
+    let store_path = kernel_dir.join("items.json");
+
+    let _ = fs::remove_file(&src_path);
+    let _ = fs::remove_file(&store_path);
+}
+
+pub fn create_kernel_structure(name: &str, gfx_ver: Option<String>) {
     let kernel_dir = Path::new("kernel_sources").join(name);
     fs::create_dir_all(kernel_dir.join("src")).unwrap();
     fs::create_dir_all(kernel_dir.join(".cargo")).unwrap();
-    fs::write(
-        kernel_dir.join(".cargo/config.toml"),
-        include_str!("cargo_config_template.toml"),
-    )
-    .unwrap();
+
+    let mut cargo_config = include_str!("cargo_config_template.toml").to_owned();
+
+    if let Some(gfx_ver) = gfx_ver {
+        let regex = Regex::new(r"gfx1103").unwrap();
+        cargo_config = regex.replace(&cargo_config, gfx_ver).to_string();
+    }
+
+    fs::write(kernel_dir.join(".cargo/config.toml"), cargo_config).unwrap();
 
     fs::write(
         kernel_dir.join("Cargo.toml"),
