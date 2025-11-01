@@ -17,7 +17,7 @@ Crate for generating subprojects with kernel source written in rust
 amdgpu_kernel_init!();
 
 // mark function that will be copied to kernel src
-#[amdgpu_kernel_attr]
+#[amdgpu_global]
 fn kernel(input: *const u32, output: *mut u32) {
     // extract data from pointer by workitem id x using helper function
     let mut num = read_by_workitem_id_x(input);

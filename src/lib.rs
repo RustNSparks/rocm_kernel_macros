@@ -15,6 +15,10 @@ const LOCK_PATH: &str = "rocm_attr.lock";
 /// Generates kernel_sources dir.
 ///
 /// If your kernel code is split across multiple files, this macro must be placed before including them.
+/// 
+/// Args:
+///     path: name of the kernel -> path + "_kernel" (if empty defaults to "kernel")
+///     gfx: target gfx version -> if empty defaults to gfx1103
 #[proc_macro]
 pub fn amdgpu_kernel_init(items: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
@@ -33,6 +37,8 @@ pub fn amdgpu_kernel_init(items: TokenStream) -> TokenStream {
     preamble::dummy_preamble().into()
 }
 
+
+/// Parses arguments passed to `amdgpu_kernel_init`, returns name of kernel and optional gfx setting.
 fn parse_kernel_init_args(items: TokenStream) -> (String, Option<String>) {
     let items = items
         .into_iter()

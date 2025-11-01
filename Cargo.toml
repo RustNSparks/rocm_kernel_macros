@@ -1,12 +1,13 @@
 [package]
 name = "rocm_kernel_macros"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["WhiskyAKM"]
 description = "macros for generating rocm kernels"
 categories = ["api-bindings", "hardware-support"]
 keywords = ["radeon", "rsmi", "hip", "rocm", "gpu"]
+readme = "readme.md"
 
 [lib]
 proc-macro = true
