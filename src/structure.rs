@@ -16,8 +16,8 @@ pub fn get_path_from_item(item: impl ToString, postamble: &str) -> String {
     path_addition + postamble
 }
 
-pub fn cleanup_kernel_structure(name: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
+pub fn cleanup_kernel_structure(name: &str, dir: &str) {
+    let kernel_dir = Path::new(dir).join(name);
     let src_path = kernel_dir.join("src/lib.rs");
     let store_path = kernel_dir.join("items.json");
 
@@ -25,29 +25,31 @@ pub fn cleanup_kernel_structure(name: &str) {
     let _ = fs::remove_file(&store_path);
 }
 
-pub fn create_kernel_structure(name: &str, gfx_ver: Option<String>) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
+pub fn create_kernel_structure(name: &str, dir: &str, gfx_ver: Option<String>, binary_name: &str) {
+    let kernel_dir = Path::new(dir).join(name);
     fs::create_dir_all(kernel_dir.join("src")).unwrap();
     fs::create_dir_all(kernel_dir.join(".cargo")).unwrap();
 
     let mut cargo_config = include_str!("cargo_config_template.toml").to_owned();
+    let mut cargo_toml = include_str!("cargo_template.toml").to_owned();
 
     if let Some(gfx_ver) = gfx_ver {
         let regex = Regex::new(r"gfx1103").unwrap();
         cargo_config = regex.replace(&cargo_config, gfx_ver).to_string();
     }
 
+    let name_regex = Regex::new(r#"name = "kernels""#).unwrap();
+    cargo_toml = name_regex
+        .replace(&cargo_toml, &format!("name = \"{}\"", binary_name))
+        .to_string();
+
     fs::write(kernel_dir.join(".cargo/config.toml"), cargo_config).unwrap();
 
-    fs::write(
-        kernel_dir.join("Cargo.toml"),
-        include_str!("cargo_template.toml"),
-    )
-    .unwrap();
+    fs::write(kernel_dir.join("Cargo.toml"), cargo_toml).unwrap();
 }
 
-pub fn store_kernel_item(name: &str, id: &str, item: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
+pub fn store_kernel_item(name: &str, dir: &str, id: &str, item: &str) {
+    let kernel_dir = Path::new(dir).join(name);
     let store_path = kernel_dir.join("items.json");
 
     let mut items: HashMap<String, String> = if store_path.exists() {
@@ -61,8 +63,8 @@ pub fn store_kernel_item(name: &str, id: &str, item: &str) {
     fs::write(store_path, serde_json::to_string_pretty(&items).unwrap()).unwrap();
 }
 
-pub fn reconstruct_kernel_lib(name: &str) {
-    let kernel_dir = Path::new("kernel_sources").join(name);
+pub fn reconstruct_kernel_lib(name: &str, dir: &str) {
+    let kernel_dir = Path::new(dir).join(name);
     let store_path = kernel_dir.join("items.json");
     let lib_path = kernel_dir.join("src/lib.rs");
 

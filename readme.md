@@ -9,9 +9,22 @@ Crate for generating subprojects with kernel source written in rust
 3. rust-src
 4. ROCM 6.0 or newer
 
+## Macro Arguments
+
+Both `amdgpu_kernel_init!()` and `amdgpu_kernel_finalize!()` accept optional arguments:
+
+- `path` - name prefix for the kernel (default: "kernel")
+- `gfx` - target GPU architecture (default: "gfx1103")
+- `dir` - directory for kernel sources (default: "kernel_sources")
+- `binary_name` - name of output binary (default: "kernels")
+
+Attribute macros `#[amdgpu_global]` and `#[amdgpu_device]` accept:
+- `path` - must match the path used in `amdgpu_kernel_init!()`
+- `dir` - must match the dir used in `amdgpu_kernel_init!()`
+
 ## Examples 
 
-1. Writing gpu kernels in rust
+1. Writing gpu kernels in rust (basic)
 ```rust
 // initialize new kernel subproject
 amdgpu_kernel_init!();
@@ -30,6 +43,37 @@ fn kernel(input: *const u32, output: *mut u32) {
 
 // compile and get path to kernel binary
 const AMDGPU_KERNEL_BINARY_PATH: &str = amdgpu_kernel_finalize!();
+```
+
+2. Writing gpu kernels with custom configuration
+```rust
+// initialize with custom settings
+amdgpu_kernel_init!(
+    path = "my_kernel",
+    gfx = "gfx1030",
+    dir = "gpu_kernels",
+    binary_name = "my_kernels"
+);
+
+// use matching path and dir in attributes
+#[amdgpu_device(path = "my_kernel", dir = "gpu_kernels")]
+fn helper(x: u32) -> u32 {
+    x * 2
+}
+
+#[amdgpu_global(path = "my_kernel", dir = "gpu_kernels")]
+fn kernel(input: *const u32, output: *mut u32) {
+    let num = read_by_workitem_id_x(input);
+    let result = helper(num);
+    write_by_workitem_id_x(output, result);
+}
+
+// compile with matching settings
+const KERNEL_PATH: &str = amdgpu_kernel_finalize!(
+    path = "my_kernel",
+    dir = "gpu_kernels",
+    binary_name = "my_kernels"
+);
 ```
 
 2. Running kernel on gpu side using `rocm-rs` (assuming above kernel)

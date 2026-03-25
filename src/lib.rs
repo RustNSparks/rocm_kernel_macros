@@ -3,50 +3,59 @@ use fslock::LockFile;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::{collections::HashMap, process::Command};
-use syn::{Item, parse_macro_input};
+use syn::{parse_macro_input, Item};
 mod preamble;
 
 mod structure;
 use structure::*;
 
 const LOCK_PATH: &str = "rocm_attr.lock";
+const DEFAULT_KERNEL_DIR: &str = "kernel_sources";
+const DEFAULT_KERNEL_NAME: &str = "kernel";
+const DEFAULT_BINARY_NAME: &str = "kernels";
 
 /// # Functionality
 /// Generates kernel_sources dir.
 ///
 /// If your kernel code is split across multiple files, this macro must be placed before including them.
-/// 
+///
 /// Args:
 ///     path: name of the kernel -> path + "_kernel" (if empty defaults to "kernel")
 ///     gfx: target gfx version -> if empty defaults to gfx1103
+///     dir: directory for kernel sources -> if empty defaults to "kernel_sources"
+///     binary_name: name of output binary -> if empty defaults to "kernels"
 #[proc_macro]
 pub fn amdgpu_kernel_init(items: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
     lockfile.lock().unwrap();
 
-    let (path, gfx) = parse_kernel_init_args(items);
+    let (path, gfx, dir, binary_name) = parse_kernel_init_args(items);
 
-    let path = get_path_from_item(path, "kernel");
+    let path = get_path_from_item(path, DEFAULT_KERNEL_NAME);
+    let dir = dir.unwrap_or_else(|| DEFAULT_KERNEL_DIR.to_string());
 
-    cleanup_kernel_structure(&path);
+    cleanup_kernel_structure(&path, &dir);
 
-    create_kernel_structure(&path, gfx);
+    let binary_name = binary_name.as_deref().unwrap_or(DEFAULT_BINARY_NAME);
+    create_kernel_structure(&path, &dir, gfx, binary_name);
 
     lockfile.unlock().unwrap();
 
     preamble::dummy_preamble().into()
 }
 
-
-/// Parses arguments passed to `amdgpu_kernel_init`, returns name of kernel and optional gfx setting.
-fn parse_kernel_init_args(items: TokenStream) -> (String, Option<String>) {
+/// Parses arguments passed to `amdgpu_kernel_init`, returns name of kernel, optional gfx setting, optional dir, and optional binary name.
+fn parse_kernel_init_args(
+    items: TokenStream,
+) -> (String, Option<String>, Option<String>, Option<String>) {
     let items = items
         .into_iter()
         .filter(|e| e.to_string() != ",")
         .collect::<Vec<_>>()
         .chunks(3)
         .map(|chunk| {
-            return (chunk[0].to_string(), chunk[2].to_string());})
+            return (chunk[0].to_string(), chunk[2].to_string());
+        })
         .fold(HashMap::new(), |mut acc, (ident, item)| {
             acc.insert(ident, item);
             acc
@@ -58,8 +67,39 @@ fn parse_kernel_init_args(items: TokenStream) -> (String, Option<String>) {
         .get_or_insert_default()
         .to_owned();
     let gfx = items.get("gfx").cloned().map(|s| s.to_owned());
+    let dir = items.get("dir").cloned().map(|s| s.to_owned());
+    let binary_name = items.get("binary_name").cloned().map(|s| s.to_owned());
 
-    return (path, gfx);
+    return (path, gfx, dir, binary_name);
+}
+
+/// Parses arguments passed to `amdgpu_kernel_finalize`, returns name of kernel, optional gfx setting, optional dir, and optional binary name.
+fn parse_finalize_args(
+    items: TokenStream,
+) -> (String, Option<String>, Option<String>, Option<String>) {
+    let items = items
+        .into_iter()
+        .filter(|e| e.to_string() != ",")
+        .collect::<Vec<_>>()
+        .chunks(3)
+        .map(|chunk| {
+            return (chunk[0].to_string(), chunk[2].to_string());
+        })
+        .fold(HashMap::new(), |mut acc, (ident, item)| {
+            acc.insert(ident, item);
+            acc
+        });
+
+    let path = items
+        .get("path")
+        .cloned()
+        .get_or_insert_default()
+        .to_owned();
+    let gfx = items.get("gfx").cloned().map(|s| s.to_owned());
+    let dir = items.get("dir").cloned().map(|s| s.to_owned());
+    let binary_name = items.get("binary_name").cloned().map(|s| s.to_owned());
+
+    return (path, gfx, dir, binary_name);
 }
 
 /// # Functionality
@@ -73,10 +113,13 @@ pub fn amdgpu_kernel_finalize(item: TokenStream) -> TokenStream {
     let mut lockfile = LockFile::open(LOCK_PATH).unwrap();
     lockfile.lock().unwrap();
 
-    let path = get_path_from_item(item, "kernel");
+    let (path, _gfx, dir, binary_name) = parse_finalize_args(item);
+    let path = get_path_from_item(path, DEFAULT_KERNEL_NAME);
+    let dir = dir.unwrap_or_else(|| DEFAULT_KERNEL_DIR.to_string());
+    let binary_name = binary_name.unwrap_or_else(|| DEFAULT_BINARY_NAME.to_string());
 
-    reconstruct_kernel_lib(&path);
-    let binary_path = build(&path);
+    reconstruct_kernel_lib(&path, &dir);
+    let binary_path = build(&path, &dir, &binary_name);
 
     quote! {
         #binary_path
@@ -108,12 +151,11 @@ pub fn amdgpu_global(attr: TokenStream, item: TokenStream) -> TokenStream {
     lockfile.lock().unwrap();
 
     let identifier = get_item_identifier(&item_parsed);
+    let (path, _, dir, _) = parse_kernel_init_args(attr);
+    let path = get_path_from_item(path, DEFAULT_KERNEL_NAME);
+    let dir = dir.unwrap_or_else(|| DEFAULT_KERNEL_DIR.to_string());
 
-    store_kernel_item(
-        &get_path_from_item(attr, "kernel"),
-        &identifier,
-        &normalized,
-    );
+    store_kernel_item(&path, &dir, &identifier, &normalized);
 
     quote!(#[allow(unused)] #item_parsed).into()
 }
@@ -132,12 +174,11 @@ pub fn amdgpu_device(attr: TokenStream, item: TokenStream) -> TokenStream {
     lockfile.lock().unwrap();
 
     let identifier = get_item_identifier(&item_parsed);
+    let (path, _, dir, _) = parse_kernel_init_args(attr);
+    let path = get_path_from_item(path, DEFAULT_KERNEL_NAME);
+    let dir = dir.unwrap_or_else(|| DEFAULT_KERNEL_DIR.to_string());
 
-    store_kernel_item(
-        &get_path_from_item(attr, "kernel"),
-        &identifier,
-        &normalized,
-    );
+    store_kernel_item(&path, &dir, &identifier, &normalized);
 
     quote!(#[allow(unused)] #item_parsed).into()
 }
@@ -159,9 +200,9 @@ fn get_item_identifier(item: &Item) -> String {
     }
 }
 
-fn build(name: &str) -> String {
+fn build(name: &str, dir: &str, binary_name: &str) -> String {
     let current_dir = std::env::current_dir().unwrap();
-    let kernel_dir = current_dir.join("kernel_sources").join(name);
+    let kernel_dir = current_dir.join(dir).join(name);
 
     let command = Command::new("cargo")
         .args(&["build", "--release"])
@@ -185,7 +226,7 @@ fn build(name: &str) -> String {
         .join("target")
         .join("amdgcn-amd-amdhsa")
         .join("release")
-        .join("kernels.elf")
+        .join(format!("{}.elf", binary_name))
         .display()
         .to_string()
 }
