@@ -3,7 +3,7 @@ use fslock::LockFile;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::{collections::HashMap, process::Command};
-use syn::{parse_macro_input, Item};
+use syn::{Item, parse_macro_input};
 mod preamble;
 
 mod structure;
@@ -205,7 +205,7 @@ fn build(name: &str, dir: &str, binary_name: &str) -> String {
     let kernel_dir = current_dir.join(dir).join(name);
 
     let command = Command::new("cargo")
-        .args(&["build", "--release"])
+        .args(&["+nightly", "build", "--release"])
         .current_dir(&kernel_dir)
         .output()
         .expect("Failed to execute cargo build");
