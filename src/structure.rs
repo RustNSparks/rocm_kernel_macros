@@ -45,6 +45,12 @@ pub fn create_kernel_structure(name: &str, dir: &str, gfx_ver: Option<String>, b
 
     fs::write(kernel_dir.join(".cargo/config.toml"), cargo_config).unwrap();
 
+    fs::write(
+        kernel_dir.join("rust-toolchain.toml"),
+        "[toolchain]\nchannel = \"nightly\"\n",
+    )
+    .unwrap();
+
     fs::write(kernel_dir.join("Cargo.toml"), cargo_toml).unwrap();
 }
 

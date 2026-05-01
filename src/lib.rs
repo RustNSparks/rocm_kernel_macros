@@ -205,8 +205,9 @@ fn build(name: &str, dir: &str, binary_name: &str) -> String {
     let kernel_dir = current_dir.join(dir).join(name);
 
     let command = Command::new("cargo")
-        .args(&["+nightly", "build", "--release"])
+        .args(&["build", "--release"])
         .current_dir(&kernel_dir)
+        .env_remove("RUSTUP_TOOLCHAIN")
         .output()
         .expect("Failed to execute cargo build");
 
