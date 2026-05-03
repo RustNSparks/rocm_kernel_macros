@@ -13,3 +13,5 @@ crate-type = ["cdylib"]
 lto = true
 [profile.release]
 lto = true
+
+[workspace]
